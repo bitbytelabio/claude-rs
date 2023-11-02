@@ -5,7 +5,6 @@ pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
-use serde_json::Value;
 use tracing::{ info, debug, warn, error };
 use serde::Deserialize;
 #[derive(Debug)]
@@ -24,12 +23,21 @@ pub struct Conversation {
 #[derive(Debug, Deserialize)]
 pub struct ChatMessage {
     pub uuid: String,
-    pub attachments: Vec<serde_json::Value>,
+    pub attachments: Vec<Attachment>,
     pub sender: String,
     pub index: i32,
     pub text: String,
     #[serde(default)]
     pub chat_feedback: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Attachment {
+    pub id: String,
+    pub extracted_content: String,
+    pub file_name: String,
+    pub file_size: i64,
+    pub file_type: String,
 }
 
 static UA: &str =
