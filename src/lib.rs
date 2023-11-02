@@ -5,12 +5,31 @@ pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
+use serde_json::Value;
 use tracing::{ info, debug, warn, error };
-
+use serde::Deserialize;
 #[derive(Debug)]
 pub struct Client {
+    pub org_uuid: String,
     pub cookies: String,
-    pub organization_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Conversation {
+    pub uuid: String,
+    pub name: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChatMessage {
+    pub uuid: String,
+    pub attachments: Vec<serde_json::Value>,
+    pub sender: String,
+    pub index: i32,
+    pub text: String,
+    #[serde(default)]
+    pub chat_feedback: Option<String>,
 }
 
 static UA: &str =
@@ -38,19 +57,19 @@ fn build_request(cookie: Option<&str>) -> Result<reqwest::Client> {
 
 impl Client {
     pub async fn new(cookies: String) -> Self {
-        let organization_id = match Self::get_organization_id(cookies.clone()).await {
+        let org_uuid = match Self::get_organization_id(cookies.clone()).await {
             Ok(id) => id,
             Err(e) => {
                 error!("failed to get organization id: {}, cookies are expired or invalid", e);
                 std::process::exit(1);
             }
         };
-        Self { cookies, organization_id }
+        Self { cookies, org_uuid }
     }
     pub async fn get_organization_id(cookies: String) -> Result<String> {
         let url = "https://claude.ai/api/organizations";
 
-        #[derive(serde::Deserialize, Debug)]
+        #[derive(Deserialize, Debug)]
         struct Response {
             uuid: String,
         }
@@ -61,7 +80,7 @@ impl Client {
             .unwrap()
             .json().await?;
 
-        debug!("response: {:?}", res);
+        debug!("response: {:#?}", res);
 
         Ok(res[0].uuid.clone())
     }
@@ -69,7 +88,48 @@ impl Client {
     pub async fn create_new_chat(&self) {
         let url = format!(
             "https://claude.ai/api/organizations/{}/chat_conversations",
-            self.organization_id
+            self.org_uuid
         );
+        todo!()
+    }
+
+    pub async fn list_all_conversations(&self) -> Result<Vec<Conversation>> {
+        let url = format!(
+            "https://claude.ai/api/organizations/{}/chat_conversations",
+            self.org_uuid
+        );
+        let res: Vec<Conversation> = build_request(Some(&self.cookies))?
+            .get(url)
+            .send().await
+            .unwrap()
+            .json().await
+            .unwrap();
+
+        debug!("response: {:#?}", res);
+
+        Ok(res)
+    }
+
+    pub async fn chat_conversation_history(&self, chat_uuid: &str) -> Result<Vec<ChatMessage>> {
+        let url = format!(
+            "https://claude.ai/api/organizations/{}/chat_conversations/{}",
+            self.org_uuid,
+            chat_uuid
+        );
+
+        #[derive(Deserialize, Debug)]
+        struct Response {
+            chat_messages: Vec<ChatMessage>,
+        }
+
+        let res: Response = build_request(Some(&self.cookies))?
+            .get(url)
+            .send().await
+            .unwrap()
+            .json().await?;
+
+        debug!("response: {:#?}", res.chat_messages);
+
+        Ok(res.chat_messages)
     }
 }
