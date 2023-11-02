@@ -1,4 +1,5 @@
 use std::path::Path;
+use uuid::Uuid;
 
 pub fn get_content_type(file_path: &str) -> &str {
     let extension = Path::new(file_path)
@@ -14,4 +15,8 @@ pub fn get_content_type(file_path: &str) -> &str {
         // Add more content types as needed for other file types
         _ => "application/octet-stream",
     }
+}
+
+pub fn generate_uuid() -> String {
+    todo!()
 }

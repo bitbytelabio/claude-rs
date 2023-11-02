@@ -1,12 +1,14 @@
 pub mod error;
 pub mod utils;
 
+use std::ffi::OsString;
+use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
+use tracing::{ debug, error };
+use serde::Deserialize;
+
 pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
-use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
-use tracing::{ info, debug, warn, error };
-use serde::Deserialize;
 #[derive(Debug)]
 pub struct Client {
     pub org_uuid: String,
@@ -139,5 +141,40 @@ impl Client {
         debug!("response: {:#?}", res.chat_messages);
 
         Ok(res.chat_messages)
+    }
+
+    pub async fn delete_conversation(&self, chat_uuid: &str) {
+        let url = format!(
+            "https://claude.ai/api/organizations/{}/chat_conversations/{}",
+            self.org_uuid,
+            chat_uuid
+        );
+
+        todo!()
+    }
+
+    pub async fn reset_all(&self) -> Result<()> {
+        let conversations = self.list_all_conversations().await?;
+
+        todo!()
+    }
+
+    pub async fn upload_attachment(self, file_path: OsString) -> Result<()> {
+        todo!()
+    }
+
+    pub async fn send_message(
+        self,
+        chat_uuid: &str,
+        prompt: &str,
+        attachment: Option<OsString>
+    ) -> Result<()> {
+        todo!()
+    }
+
+    pub async fn rename_chat(&self, chat_uuid: &str, title: &str) {
+        let url = "https://claude.ai/api/rename_chat";
+
+        todo!()
     }
 }
