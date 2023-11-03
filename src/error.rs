@@ -7,4 +7,5 @@ pub enum Error {
     #[error("can not parse http header")] ParseHttpHeaderError(
         #[from] reqwest::header::InvalidHeaderValue,
     ),
+    #[error("io error")] IoError(#[from] std::io::Error),
 }

@@ -1,7 +1,7 @@
 pub mod error;
 pub mod utils;
 
-use std::ffi::OsString;
+use std::path::Path;
 use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
 use tracing::{ debug, error };
 use serde::{ Deserialize, Serialize };
@@ -195,7 +195,12 @@ impl Client {
         Ok(())
     }
 
-    pub async fn upload_attachment(self, file_path: OsString) -> Result<()> {
+    pub async fn upload_attachment(self, file_path: &str) -> Result<()> {
+        let path = Path::new(file_path);
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+        let file_type = utils::get_content_type(path);
+        let file_size = utils::get_file_size(file_path)?;
+
         todo!()
     }
 
@@ -203,8 +208,18 @@ impl Client {
         self,
         chat_uuid: &str,
         prompt: &str,
-        attachment: Option<OsString>
+        attachments: Option<Vec<&str>>
     ) -> Result<()> {
+        let url = "https://claude.ai/api/append_message";
+        let attachments = attachments.unwrap_or_default();
+
+        struct Payload {
+            organization_uuid: String,
+            conversation_uuid: String,
+            text: String,
+            attachments: Vec<Attachment>,
+        }
+
         todo!()
     }
 
