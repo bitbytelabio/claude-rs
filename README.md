@@ -2,14 +2,6 @@
 
 This project provides an unofficial API for Claude AI, allowing users to access and interact with Claude AI written in Rust. Inspired by [Claude-API](https://github.com/KoushikNavuluri/Claude-API/tree/main)
 
-## Use Cases
-
-    1. Console ChatBot ( Check in usecases folder for sample console chatbot )
-
-    2. Discord Chatbot
-
-    3. Many more can be done....
-
 ## Installation
 
 Create a Cargo.toml file as example bellow:
