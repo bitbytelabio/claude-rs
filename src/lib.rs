@@ -1,18 +1,16 @@
 pub mod error;
 
-use reqwest::header::{
-    HeaderValue,
-    HeaderMap,
-    ACCEPT,
-    ORIGIN,
-    REFERER,
-    COOKIE,
-    CONNECTION,
-    USER_AGENT,
+use reqwest::{
+    header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE, CONNECTION, USER_AGENT },
+    multipart::{ Part, Form },
+    Body,
 };
+use serde_json::Value;
+use tokio::fs::File;
+use tokio_util::codec::{ BytesCodec, FramedRead };
 use tracing::{ debug, error };
 use serde::Deserialize;
-use std::time::Duration;
+use std::{ time::Duration, path::Path };
 
 pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -201,15 +199,33 @@ impl Client {
         Ok(())
     }
 
-    pub fn upload_attachment(&self, file_path: &str) -> Result<()> {
-        // TODO:
+    pub async fn upload_attachment(&self, file_path: &str) -> Result<Value> {
         let url = "https://claude.ai/api/convert_document";
+        let mut headers = HEADERS.clone();
+        headers.insert(COOKIE, HeaderValue::from_str(&self.cookies)?);
 
-        Ok(())
+        let client = build_request(&self.cookies)?;
+
+        let file = File::open(file_path).await?;
+        let stream = FramedRead::new(file, BytesCodec::new());
+        let extension = Path::new(file_path).extension().unwrap().to_str().unwrap();
+
+        let mine = match extension {
+            "txt" => "text/plain".to_string(),
+            _ => format!("application/{}", extension),
+        };
+        let part = Part::stream(Body::wrap_stream(stream))
+            .file_name(file_path.to_string())
+            .mime_str(&mine)?;
+        let form = Form::new().part("file", part).text("orgUuid", self.org_uuid.clone());
+        let res = client.post(url).multipart(form).send().await?.json::<Value>().await?;
+        debug!("response: {:#?}", res);
+
+        Ok(res)
     }
 
     pub async fn send_message(
-        self,
+        &self,
         chat_uuid: &str,
         prompt: &str,
         attachments: Option<Vec<&str>>,
