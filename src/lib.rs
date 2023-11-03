@@ -1,10 +1,10 @@
 pub mod error;
-pub mod utils;
 
-use std::path::Path;
+use reqwest::blocking::multipart;
 use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
 use tracing::{ debug, error };
-use serde::{ Deserialize, Serialize };
+use serde::Deserialize;
+use std::time::Duration;
 
 pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -101,16 +101,11 @@ impl Client {
             self.org_uuid
         );
 
-        #[derive(Serialize, Debug)]
-        struct Payload {
-            uuid: uuid::Uuid,
-            name: String,
-        }
-
-        let payload = Payload {
-            uuid: uuid::Uuid::new_v4(),
-            name: "".to_string(),
-        };
+        let payload =
+            serde_json::json!({
+            "uuid": uuid::Uuid::new_v4(),
+            "name": "".to_string(),
+        });
 
         let res: Conversation = build_request(Some(&self.cookies))?
             .post(url)
@@ -170,14 +165,10 @@ impl Client {
             chat_uuid
         );
 
-        #[derive(Serialize, Debug)]
-        struct Payload {
-            conversation_id: String,
-        }
-
-        let payload = Payload {
-            conversation_id: chat_uuid.to_string(),
-        };
+        let payload =
+            serde_json::json!({
+            "conversation_id": chat_uuid.to_string(),
+            });
 
         let res = build_request(Some(&self.cookies))?.delete(url).json(&payload).send().await?;
 
@@ -195,49 +186,95 @@ impl Client {
         Ok(())
     }
 
-    pub async fn upload_attachment(self, file_path: &str) -> Result<()> {
-        let path = Path::new(file_path);
-        let file_name = path.file_name().unwrap().to_str().unwrap();
-        let file_type = utils::get_content_type(path);
-        let file_size = utils::get_file_size(file_path)?;
+    pub async fn upload_attachment(&self, file_path: &str) -> Result<()> {
+        let url = "https://claude.ai/api/convert_document";
 
-        todo!()
+        let form = multipart::Form
+            ::new()
+            .file("file", file_path)?
+            .text("orgUuid", self.org_uuid.clone());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(ORIGIN, HeaderValue::from_static("https://claude.ai"));
+        headers.insert(REFERER, HeaderValue::from_static("https://claude.ai/chats/"));
+        headers.insert(COOKIE, HeaderValue::from_str(&self.cookies)?);
+
+        let res = reqwest::blocking::Client
+            ::new()
+            .post(url)
+            .headers(headers)
+            .multipart(form)
+            .send()?;
+        // .json::<serde_json::Value>()?;
+
+        debug!("response: {:#?}", res);
+
+        Ok(())
     }
 
     pub async fn send_message(
         self,
         chat_uuid: &str,
         prompt: &str,
-        attachments: Option<Vec<&str>>
-    ) -> Result<()> {
+        attachments: Option<Vec<&str>>,
+        timeout: Option<u64>
+    ) -> Result<String> {
         let url = "https://claude.ai/api/append_message";
         let attachments = attachments.unwrap_or_default();
+        let timeout = timeout.unwrap_or(500);
 
-        struct Payload {
-            organization_uuid: String,
-            conversation_uuid: String,
-            text: String,
-            attachments: Vec<Attachment>,
+        let payload =
+            serde_json::json!({
+             "completion": {
+                "prompt": prompt,
+                "timezone": "Asia/Kolkata",
+                "model": "claude-2"
+            },
+            "organization_uuid": self.org_uuid.clone(),
+            "conversation_uuid": chat_uuid,
+            "text": prompt,
+            "attachments": attachments
+            });
+
+        let response = build_request(Some(&self.cookies))?
+            .post(url)
+            .json(&payload)
+            .timeout(Duration::from_secs(timeout))
+            .send().await?;
+
+        let decoded_data = response.text().await?;
+        let re = regex::Regex::new(r"\n+").unwrap();
+        let decoded_data = re.replace_all(&decoded_data, "\n").trim().to_string();
+
+        let data_strings: Vec<&str> = decoded_data.split('\n').collect();
+        let mut completions = Vec::new();
+
+        for data_string in data_strings {
+            let json_str = &data_string[6..].trim();
+            let data: serde_json::Value = serde_json::from_str(json_str)?;
+            debug!("data: {:#?}", data);
+            if data.get("completion").is_some() {
+                completions.push(data["completion"].as_str().unwrap().to_string());
+            }
         }
 
-        todo!()
+        let answer = completions.join("");
+
+        debug!("response: {:#?}", answer);
+
+        Ok(answer)
     }
 
     pub async fn rename_chat(&self, chat_uuid: &str, title: &str) -> Result<()> {
         let url = "https://claude.ai/api/rename_chat";
 
-        #[derive(Serialize, Debug)]
-        struct Payload {
-            organization_uuid: String,
-            conversation_uuid: String,
-            title: String,
-        }
-
-        let payload = Payload {
-            organization_uuid: self.org_uuid.clone(),
-            conversation_uuid: chat_uuid.to_string(),
-            title: title.to_string(),
-        };
+        let payload =
+            serde_json::json!( {
+            "organization_uuid": self.org_uuid.clone(),
+            "conversation_uuid": chat_uuid.to_string(),
+            "title": title.to_string(),
+        });
 
         let res = build_request(Some(&self.cookies))?.post(url).json(&payload).send().await?;
 

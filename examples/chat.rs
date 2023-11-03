@@ -13,7 +13,7 @@ async fn main() {
         var("SESSION_KEY").unwrap()
     );
     // info!("cookies: {}", cookies);
-    // let client = Client::new(cookies).await;
+    let client = Client::new(cookies).await;
     // info!("client: {:?}", client);
 
     // client.list_all_conversations().await.unwrap();
@@ -23,10 +23,13 @@ async fn main() {
     // client.delete_conversation("a100c91c-aae5-4bf0-a1bd-48fe9142a617").await.unwrap();
     // client.rename_chat("e56a5ab3-0eca-4a04-9c63-3fadaf14cd17", "test").await.unwrap();
 
-    let file_path = OsStr::new("./tmp/1.pdf");
-    let ftype = claude::utils::get_content_type(file_path);
-    info!("file type: {}", ftype);
-
-    let size = claude::utils::get_file_size(file_path).unwrap();
-    info!("file size: {}", size);
+    // client.upload_attachment("tmp/1.pdf").await.unwrap();
+    client
+        .send_message(
+            "e56a5ab3-0eca-4a04-9c63-3fadaf14cd17",
+            "Explain web3 and blockchain in layman's terms. What can Bug bounty hunters do to help?",
+            None,
+            None
+        ).await
+        .unwrap();
 }
