@@ -151,11 +151,7 @@ impl Client {
             uuid: String,
         }
 
-        let res: Vec<Response> = build_request(&cookies)?
-            .get(url)
-            .send().await
-            .unwrap()
-            .json().await?;
+        let res: Vec<Response> = build_request(&cookies)?.get(url).send().await?.json().await?;
 
         debug!("response: {:#?}", res);
 
@@ -257,10 +253,8 @@ impl Client {
         );
         let res: Vec<Conversation> = build_request(&self.cookies)?
             .get(url)
-            .send().await
-            .unwrap()
-            .json().await
-            .unwrap();
+            .send().await?
+            .json().await?;
 
         debug!("response: {:#?}", res);
 
@@ -315,11 +309,7 @@ impl Client {
             chat_messages: Vec<ChatMessage>,
         }
 
-        let res: Response = build_request(&self.cookies)?
-            .get(url)
-            .send().await
-            .unwrap()
-            .json().await?;
+        let res: Response = build_request(&self.cookies)?.get(url).send().await?.json().await?;
 
         debug!("response: {:#?}", res.chat_messages);
 
