@@ -2,10 +2,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed to send http request")] HttpRequestError(#[from] reqwest::Error),
-    #[error("failed to parse json response")] ParseJsonError(#[from] serde_json::Error),
-    #[error("can not parse http header")] ParseHttpHeaderError(
+    #[error("HTTP request failed: {0}")] HttpRequestFailure(#[from] reqwest::Error),
+    #[error("JSON parsing failed: {0}")] JsonParsingFailure(#[from] serde_json::Error),
+    #[error("Invalid HTTP header value: {0}")] InvalidHttpHeaderValue(
         #[from] reqwest::header::InvalidHeaderValue,
     ),
-    #[error("io error")] IoError(#[from] std::io::Error),
+    #[error("Input/Output operation failed: {0}")] IoOperationFailure(#[from] std::io::Error),
 }
