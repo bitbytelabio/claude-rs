@@ -110,6 +110,7 @@ name = "claude-rs"
 version = "0.1.0"
 dependencies = [
  "dotenv",
+ "lazy_static",
  "regex",
  "reqwest",
  "serde",

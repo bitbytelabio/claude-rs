@@ -1,7 +1,15 @@
 pub mod error;
 
-use reqwest::blocking::multipart;
-use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
+use reqwest::header::{
+    HeaderValue,
+    HeaderMap,
+    ACCEPT,
+    ORIGIN,
+    REFERER,
+    COOKIE,
+    CONNECTION,
+    USER_AGENT,
+};
 use tracing::{ debug, error };
 use serde::Deserialize;
 use std::time::Duration;
@@ -45,14 +53,21 @@ pub struct Attachment {
 static UA: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36";
 
-fn build_request(cookie: Option<&str>) -> Result<reqwest::Client> {
-    let mut headers = HeaderMap::new();
-    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-    headers.insert(ORIGIN, HeaderValue::from_static("https://claude.ai"));
-    headers.insert(REFERER, HeaderValue::from_static("https://claude.ai/chats/"));
-    if let Some(cookie) = cookie {
-        headers.insert(COOKIE, HeaderValue::from_str(cookie)?);
-    }
+lazy_static::lazy_static! {
+    static ref HEADERS: HeaderMap = {
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(ORIGIN, HeaderValue::from_static("https://claude.ai"));
+        headers.insert(REFERER, HeaderValue::from_static("https://claude.ai/chats/"));
+        headers.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
+        headers.insert(USER_AGENT, HeaderValue::from_static(UA));
+        headers
+    };
+}
+
+fn build_request(cookie: &str) -> Result<reqwest::Client> {
+    let mut headers = HEADERS.clone();
+    headers.insert(COOKIE, HeaderValue::from_str(cookie)?);
 
     let client = reqwest::Client
         ::builder()
@@ -84,7 +99,7 @@ impl Client {
             uuid: String,
         }
 
-        let res: Vec<Response> = build_request(Some(&cookies))?
+        let res: Vec<Response> = build_request(&cookies)?
             .get(url)
             .send().await
             .unwrap()
@@ -107,7 +122,7 @@ impl Client {
             "name": "".to_string(),
         });
 
-        let res: Conversation = build_request(Some(&self.cookies))?
+        let res: Conversation = build_request(&self.cookies)?
             .post(url)
             .json(&payload)
             .send().await?
@@ -123,7 +138,7 @@ impl Client {
             "https://claude.ai/api/organizations/{}/chat_conversations",
             self.org_uuid
         );
-        let res: Vec<Conversation> = build_request(Some(&self.cookies))?
+        let res: Vec<Conversation> = build_request(&self.cookies)?
             .get(url)
             .send().await
             .unwrap()
@@ -147,7 +162,7 @@ impl Client {
             chat_messages: Vec<ChatMessage>,
         }
 
-        let res: Response = build_request(Some(&self.cookies))?
+        let res: Response = build_request(&self.cookies)?
             .get(url)
             .send().await
             .unwrap()
@@ -170,7 +185,7 @@ impl Client {
             "conversation_id": chat_uuid.to_string(),
             });
 
-        let res = build_request(Some(&self.cookies))?.delete(url).json(&payload).send().await?;
+        let res = build_request(&self.cookies)?.delete(url).json(&payload).send().await?;
 
         debug!("response: {:#?}", res);
 
@@ -186,29 +201,9 @@ impl Client {
         Ok(())
     }
 
-    pub async fn upload_attachment(&self, file_path: &str) -> Result<()> {
+    pub fn upload_attachment(&self, file_path: &str) -> Result<()> {
+        // TODO:
         let url = "https://claude.ai/api/convert_document";
-
-        let form = multipart::Form
-            ::new()
-            .file("file", file_path)?
-            .text("orgUuid", self.org_uuid.clone());
-
-        let mut headers = HeaderMap::new();
-        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-        headers.insert(ORIGIN, HeaderValue::from_static("https://claude.ai"));
-        headers.insert(REFERER, HeaderValue::from_static("https://claude.ai/chats/"));
-        headers.insert(COOKIE, HeaderValue::from_str(&self.cookies)?);
-
-        let res = reqwest::blocking::Client
-            ::new()
-            .post(url)
-            .headers(headers)
-            .multipart(form)
-            .send()?;
-        // .json::<serde_json::Value>()?;
-
-        debug!("response: {:#?}", res);
 
         Ok(())
     }
@@ -228,7 +223,7 @@ impl Client {
             serde_json::json!({
              "completion": {
                 "prompt": prompt,
-                "timezone": "Asia/Kolkata",
+                "timezone": "Asia/Saigon",
                 "model": "claude-2"
             },
             "organization_uuid": self.org_uuid.clone(),
@@ -237,7 +232,7 @@ impl Client {
             "attachments": attachments
             });
 
-        let response = build_request(Some(&self.cookies))?
+        let response = build_request(&self.cookies)?
             .post(url)
             .json(&payload)
             .timeout(Duration::from_secs(timeout))
@@ -276,7 +271,7 @@ impl Client {
             "title": title.to_string(),
         });
 
-        let res = build_request(Some(&self.cookies))?.post(url).json(&payload).send().await?;
+        let res = build_request(&self.cookies)?.post(url).json(&payload).send().await?;
 
         debug!("response: {:#?}", res);
 
