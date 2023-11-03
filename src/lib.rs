@@ -293,8 +293,8 @@ impl Client {
     ///         var("SESSION_KEY").unwrap()
     ///     );
     ///     let client = Client::new(cookies).await;
-    ///     let chat_hist = client.chat_conversation_history().await.unwrap();
-    ///     tracing::info!("{:?}", chat_hist);
+    ///     let chat_hist = client.chat_conversation_history("chat_uuid").await.unwrap();
+    ///     tracing::info!("{:#?}", chat_hist);
     /// }
     /// ```
     pub async fn chat_conversation_history(&self, chat_uuid: &str) -> Result<Vec<ChatMessage>> {
