@@ -232,7 +232,18 @@ impl Client {
         timeout: Option<u64>
     ) -> Result<String> {
         let url = "https://claude.ai/api/append_message";
-        let attachments = attachments.unwrap_or_default();
+        let attachments = match attachments {
+            Some(attachments) => {
+                let mut res: Vec<Value> = vec![];
+                for a in attachments {
+                    let attachment = self.upload_attachment(a).await?;
+                    res.push(attachment);
+                }
+                res
+            }
+            None => vec![],
+        };
+
         let timeout = timeout.unwrap_or(500);
 
         let payload =
@@ -264,7 +275,6 @@ impl Client {
         for data_string in data_strings {
             let json_str = &data_string[6..].trim();
             let data: serde_json::Value = serde_json::from_str(json_str)?;
-            debug!("data: {:#?}", data);
             if data.get("completion").is_some() {
                 completions.push(data["completion"].as_str().unwrap().to_string());
             }
