@@ -4,7 +4,7 @@ pub mod utils;
 use std::ffi::OsString;
 use reqwest::header::{ HeaderValue, HeaderMap, ACCEPT, ORIGIN, REFERER, COOKIE };
 use tracing::{ debug, error };
-use serde::Deserialize;
+use serde::{ Deserialize, Serialize };
 
 pub use error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -27,7 +27,7 @@ pub struct ChatMessage {
     pub uuid: String,
     pub attachments: Vec<Attachment>,
     pub sender: String,
-    pub index: i32,
+    pub index: usize,
     pub text: String,
     #[serde(default)]
     pub chat_feedback: Option<String>,
@@ -95,12 +95,32 @@ impl Client {
         Ok(res[0].uuid.clone())
     }
 
-    pub async fn create_new_chat(&self) {
+    pub async fn create_new_chat(&self) -> Result<Conversation> {
         let url = format!(
             "https://claude.ai/api/organizations/{}/chat_conversations",
             self.org_uuid
         );
-        todo!()
+
+        #[derive(Serialize, Debug)]
+        struct Payload {
+            uuid: uuid::Uuid,
+            name: String,
+        }
+
+        let payload = Payload {
+            uuid: uuid::Uuid::new_v4(),
+            name: "".to_string(),
+        };
+
+        let res: Conversation = build_request(Some(&self.cookies))?
+            .post(url)
+            .json(&payload)
+            .send().await?
+            .json().await?;
+
+        debug!("response: {:#?}", res);
+
+        Ok(res)
     }
 
     pub async fn list_all_conversations(&self) -> Result<Vec<Conversation>> {
@@ -143,20 +163,36 @@ impl Client {
         Ok(res.chat_messages)
     }
 
-    pub async fn delete_conversation(&self, chat_uuid: &str) {
+    pub async fn delete_conversation(&self, chat_uuid: &str) -> Result<()> {
         let url = format!(
             "https://claude.ai/api/organizations/{}/chat_conversations/{}",
             self.org_uuid,
             chat_uuid
         );
 
-        todo!()
+        #[derive(Serialize, Debug)]
+        struct Payload {
+            conversation_id: String,
+        }
+
+        let payload = Payload {
+            conversation_id: chat_uuid.to_string(),
+        };
+
+        let res = build_request(Some(&self.cookies))?.delete(url).json(&payload).send().await?;
+
+        debug!("response: {:#?}", res);
+
+        Ok(())
     }
 
     pub async fn reset_all(&self) -> Result<()> {
         let conversations = self.list_all_conversations().await?;
 
-        todo!()
+        for conversation in conversations {
+            self.delete_conversation(&conversation.uuid).await?;
+        }
+        Ok(())
     }
 
     pub async fn upload_attachment(self, file_path: OsString) -> Result<()> {
@@ -172,9 +208,26 @@ impl Client {
         todo!()
     }
 
-    pub async fn rename_chat(&self, chat_uuid: &str, title: &str) {
+    pub async fn rename_chat(&self, chat_uuid: &str, title: &str) -> Result<()> {
         let url = "https://claude.ai/api/rename_chat";
 
-        todo!()
+        #[derive(Serialize, Debug)]
+        struct Payload {
+            organization_uuid: String,
+            conversation_uuid: String,
+            title: String,
+        }
+
+        let payload = Payload {
+            organization_uuid: self.org_uuid.clone(),
+            conversation_uuid: chat_uuid.to_string(),
+            title: title.to_string(),
+        };
+
+        let res = build_request(Some(&self.cookies))?.post(url).json(&payload).send().await?;
+
+        debug!("response: {:#?}", res);
+
+        Ok(())
     }
 }
